@@ -1,5 +1,5 @@
 import express from "express";
-import { validateDecision } from "../../schemas/index.js";
+import { validateDecision } from "../schemas/index.js";
 import { runDecision } from "../engine/module2.js";
 
 const router = express.Router();
