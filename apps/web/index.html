@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIS - Seller Intelligence System</title>
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- PDF libs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-screen">
+        <div class="login-card">
+            <div class="login-logo">
+                <img src="logo.png" alt="SIS Logo" onerror="this.style.display='none'">
+                <h1>SIS</h1>
+                <p class="subtitle">Seller Intelligence System</p>
+            </div>
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" required placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required placeholder="Enter password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+                <p class="login-note">Internal testing access only</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="app hidden">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-brand">
+                <img src="logo.png" alt="SIS Logo" class="header-logo" onerror="this.style.display='none'">
+                <div class="header-text">
+                    <h1>SIS</h1>
+                    <span class="header-subtitle">Seller Intelligence System</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span id="user-email" class="user-email"></span>
+                <button id="logout-btn" class="btn btn-secondary btn-sm">Sign Out</button>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab active" data-tab="discovery">Discovery (Module 0)</button>
+            <button class="tab" data-tab="decision">Decision (Module 2)</button>
+            <button class="tab" data-tab="runlog">Run Log</button>
+            <button class="tab" data-tab="about">About</button>
+        </nav>
+
+        <!-- Tab Content -->
+        <main class="main-content">
+            <!-- Discovery Tab -->
+            <section id="discovery-tab" class="tab-content active">
+                <div class="section-header">
+                    <h2>Module 0: Discovery</h2>
+                    <p class="section-desc">Generate a clean list of product candidates (exploration only)</p>
+                </div>
+
+                <div class="card">
+                    <h3>Configuration</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="discovery-marketplace">Marketplace</label>
+                            <select id="discovery-marketplace">
+                                <option value="UK">United Kingdom (UK)</option>
+                                <option value="USA">United States (USA)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="discovery-category">Category</label>
+                            <input type="text" id="discovery-category" placeholder="e.g., Home organization, Pet accessories">
+                        </div>
+                        <div class="form-group">
+                            <label for="discovery-candidates">Number of Candidates</label>
+                            <input type="number" id="discovery-candidates" min="5" max="50" value="10">
+                        </div>
+                        <div class="form-group">
+                            <label for="discovery-language">Output Language</label>
+                            <select id="discovery-language">
+                                <option value="EN">English (EN)</option>
+                                <option value="ES">Spanish (ES)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button id="discovery-generate" class="btn btn-primary">Run Discovery</button>
+                </div>
+
+                <div id="discovery-output" class="output-section hidden">
+                    <div class="card">
+                        <div class="output-header">
+                            <h3>Discovery Results</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-secondary btn-sm copy-btn" data-target="discovery-prompt-text">Copy</button>
+                                <button id="download-discovery-pdf" class="btn btn-accent btn-sm">Download PDF</button>
+                            </div>
+                        </div>
+                        <div class="output-box">
+                            <pre id="discovery-prompt-text" class="output-text"></pre>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="output-header">
+                            <h3>Input Snapshot</h3>
+                            <button class="btn btn-secondary btn-sm copy-btn" data-target="discovery-input-text">Copy</button>
+                        </div>
+                        <div class="output-box">
+                            <pre id="discovery-input-text" class="output-text"></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Decision Tab -->
+            <section id="decision-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Module 2: Decision</h2>
+                    <p class="section-desc">Paste a product URL → SIS decides (no prompts, no Manus)</p>
+                </div>
+
+                <div class="card">
+                    <h3>Product Configuration</h3>
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="decision-url">Product URL</label>
+                            <input type="url" id="decision-url" placeholder="https://www.amazon.co.uk/dp/B0XXXXXXXXX">
+                        </div>
+                        <div class="form-group">
+                            <label for="decision-marketplace">Marketplace</label>
+                            <select id="decision-marketplace">
+                                <option value="UK">United Kingdom (UK)</option>
+                                <option value="USA">United States (USA)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="decision-capital">Capital Profile</label>
+                            <select id="decision-capital">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="scale">Scale</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="decision-phase">Product Phase</label>
+                            <select id="decision-phase">
+                                <option value="white_label">White Label</option>
+                                <option value="private_label">Private Label</option>
+                                <option value="brand">Brand</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="decision-strategy">Entry Strategy</label>
+                            <select id="decision-strategy">
+                                <option value="conservative">Conservative</option>
+                                <option value="aggressive">Aggressive</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="decision-language">Language</label>
+                            <select id="decision-language">
+                                <option value="EN">English (EN)</option>
+                                <option value="ES">Spanish (ES)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button id="decision-generate" class="btn btn-primary">Run Decision</button>
+                </div>
+
+                <div id="decision-output" class="output-section hidden">
+                    <div class="card">
+                        <div class="output-header">
+                            <h3>SIS Decision Report</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-secondary btn-sm copy-btn" data-target="decision-message-text">Copy</button>
+                                <button id="download-decision-pdf" class="btn btn-accent btn-sm">Download PDF</button>
+                            </div>
+                        </div>
+                        <div class="output-box hidden">
+  <textarea id="decision-message-text" class="output-textarea" readonly></textarea>
+</div>
+                        <div class="output-actions">
+                            <button id="save-to-log" class="btn btn-accent">Save Run to Log</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Run Log Tab -->
+            <section id="runlog-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Run Log</h2>
+                    <p class="section-desc">Track and manage your decision runs</p>
+                </div>
+
+                <div class="card">
+                    <div class="log-actions">
+                        <button id="export-log" class="btn btn-secondary">Export JSON</button>
+                        <button id="clear-log" class="btn btn-danger">Clear Log</button>
+                    </div>
+                </div>
+
+                <div id="log-container" class="log-container">
+                    <div class="empty-state" id="empty-log">
+                        <p>No runs logged yet. Run a Decision and save it to start tracking.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- About Tab -->
+            <section id="about-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>About SIS</h2>
+                    <p class="section-desc">Two-module workflow: Discovery → Decision</p>
+                </div>
+
+                <div class="card">
+                    <h3>System Status</h3>
+                    <div class="status-badge">
+                        <span class="status-indicator"></span>
+                        Local execution (Phase 2)
+                    </div>
+                    <p class="status-note">SIS runs locally via Node.js API + Keepa. No Manus is used.</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>SIS - Seller Intelligence System • Internal Testing</p>
+        </footer>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
