@@ -1,5 +1,5 @@
 import express from "express";
-import { validateDiscovery } from "../../schemas/index.js";
+import { validateDiscovery } from "../schemas/index.js";
 import { runDiscovery } from "../engine/module0.js";
 
 const router = express.Router();
