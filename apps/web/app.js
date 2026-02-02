@@ -172,8 +172,107 @@ $("decision-generate")?.addEventListener("click", async () => {
 
 $("download-decision-pdf")?.addEventListener("click", () => {
   if (!lastDecision?.data) return alert("No decision data");
+
   const { payload, data, ts } = lastDecision;
   const sig = data.extracted_signals || {};
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    return alert("PDF library not loaded");
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF("p", "mm", "a4");
+
+  // ===== HEADER =====
+  doc.setFontSize(16);
+  doc.text("Análisis de Producto Candidato", 14, 15);
+
+  doc.setFontSize(10);
+  doc.text(`Fecha: ${ts.toLocaleString()}`, 14, 22);
+  doc.text(`Marketplace: ${payload.marketplace}`, 14, 27);
+  doc.text(`Fase: ${payload.product_phase}`, 14, 32);
+  doc.text(`Estrategia: ${payload.entry_strategy}`, 14, 37);
+
+  // ===== VERDICT =====
+  doc.setFontSize(12);
+  doc.text(`VEREDICTO: ${data.verdict}`, 14, 45);
+
+  const summaryLines = doc.splitTextToSize(
+    `RESUMEN: ${data.summary}`,
+    180
+  );
+  doc.setFontSize(10);
+  doc.text(summaryLines, 14, 52);
+
+  let y = 52 + summaryLines.length * 5 + 4;
+
+  // ===== DATOS DEL PRODUCTO (texto normal, NO tabla) =====
+  doc.setFontSize(11);
+  doc.text("Datos del producto", 14, y);
+  y += 6;
+
+  doc.setFontSize(9);
+
+  const rows = [
+    ["URL", payload.url],
+    ["Título", sig.title || ""],
+    ["Marca", sig.brandName || ""],
+    ["Categoría", sig.category || ""],
+    ["Precio", sig.price ?? ""],
+    ["Rating", sig.rating ?? ""],
+    ["Reviews", sig.reviewCount ?? ""],
+    ["BSR", sig.bsr ?? ""],
+    ["Competidores", sig.competitorCount ?? ""],
+    ["Peso (kg)", sig.weightKg ?? ""],
+  ];
+
+  rows.forEach(([label, value]) => {
+    if (y > 270) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setFont(undefined, "bold");
+    doc.text(`${label}:`, 14, y);
+
+    doc.setFont(undefined, "normal");
+    const valueLines = doc.splitTextToSize(String(value), 150);
+    doc.text(valueLines, 45, y);
+
+    y += Math.max(5, valueLines.length * 4);
+  });
+
+  // ===== REGLAS DE DESCARTE =====
+  doc.autoTable({
+    startY: y + 6,
+    head: [["Regla", "Resultado", "Motivo"]],
+    body: (data.discard_rules_results || []).map(r => [
+      r.rule,
+      r.passed ? "APROBADA" : "FALLIDA",
+      r.reason || ""
+    ]),
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [30, 58, 138] }
+  });
+
+  // ===== STAR SCORE =====
+  if (data.star_score?.components) {
+    doc.autoTable({
+      startY: doc.lastAutoTable.finalY + 8,
+      head: [["Componente", "Score", "Peso", "Explicación"]],
+      body: data.star_score.components.map(c => [
+        c.name,
+        String(c.score),
+        `${c.weight}%`,
+        c.explanation || ""
+      ]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [30, 58, 138] }
+    });
+  }
+
+  doc.save(`Analisis_Producto_${Date.now()}.pdf`);
+});
 
   downloadPDF(
     "SIS Decision Report",
