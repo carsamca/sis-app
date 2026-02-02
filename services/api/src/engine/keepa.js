@@ -10,13 +10,16 @@ const DOMAIN_ID = { USA: 1, UK: 2 };
 
 export function asinFromUrl(url) {
   const u = (url || "").trim();
+
   const m =
     u.match(/\/dp\/([A-Z0-9]{10})/i) ||
     u.match(/\/gp\/product\/([A-Z0-9]{10})/i) ||
+    u.match(/\/gp\/aw\/d\/([A-Z0-9]{10})/i) ||     // ✅ NEW
+    u.match(/\/aw\/d\/([A-Z0-9]{10})/i) ||         // ✅ NEW
     u.match(/asin=([A-Z0-9]{10})/i);
+
   return m ? m[1].toUpperCase() : null;
 }
-
 function keepaPriceToNumber(p) {
   if (p == null) return null;
   const n = Number(p);
