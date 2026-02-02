@@ -8,9 +8,7 @@ let lastDiscovery = null;
 let lastDecision = null;
 
 // ---------- helpers ----------
-function $(id) {
-  return document.getElementById(id);
-}
+function $(id) { return document.getElementById(id); }
 
 function setHidden(el, hidden) {
   if (!el) return;
@@ -19,41 +17,17 @@ function setHidden(el, hidden) {
 
 async function copyText(text) {
   if (!text || !text.trim()) return alert("Nothing to copy");
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    alert("Copy failed");
-  }
+  try { await navigator.clipboard.writeText(text); }
+  catch { alert("Copy failed"); }
 }
 
-function downloadPDF(title, metaLines, tables) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF("p", "mm", "a4");
+function t(lang, en, es) {
+  return (lang === "ES") ? es : en;
+}
 
-  doc.setFontSize(16);
-  doc.text(title, 14, 15);
-
-  doc.setFontSize(10);
-  let y = 22;
-  metaLines.forEach((line) => {
-    doc.text(line, 14, y);
-    y += 5;
-  });
-
-  let startY = y + 3;
-
-  tables.forEach((t) => {
-    doc.autoTable({
-      startY,
-      head: [t.head],
-      body: t.body,
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [30, 58, 138] },
-    });
-    startY = doc.lastAutoTable.finalY + 8;
-  });
-
-  doc.save(`${title.replace(/\s+/g, "_")}_${Date.now()}.pdf`);
+function safeStr(v) {
+  if (v === null || v === undefined) return "";
+  return String(v);
 }
 
 // ---------- tabs ----------
@@ -65,7 +39,6 @@ function switchTab(name) {
     sec.classList.toggle("active", sec.id === `${name}-tab`);
   });
 }
-
 document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => switchTab(btn.dataset.tab));
 });
@@ -100,9 +73,7 @@ $("discovery-generate")?.addEventListener("click", async () => {
     lines.push("");
 
     data.candidates.forEach((c, i) => {
-      lines.push(
-        `${i + 1}. ${c.product} | ${c.category} | ${c.priceRange} | ${c.signal}`
-      );
+      lines.push(`${i + 1}. ${c.product} | ${c.category} | ${c.priceRange} | ${c.signal}`);
     });
 
     $("discovery-text").textContent = lines.join("\n");
@@ -117,27 +88,37 @@ $("download-discovery-pdf")?.addEventListener("click", () => {
 
   const { payload, data, ts } = lastDiscovery;
 
-  downloadPDF(
-    "SIS Discovery Results",
-    [
-      `Generated: ${ts.toLocaleString()}`,
-      `Marketplace: ${payload.marketplace}`,
-      `Category: ${payload.category}`,
-      `Count: ${payload.count}`,
-    ],
-    [
-      {
-        head: ["Product", "Category", "Price", "Signal", "Note"],
-        body: data.candidates.map((c) => [
-          c.product,
-          c.category,
-          c.priceRange,
-          c.signal,
-          c.note,
-        ]),
-      },
-    ]
-  );
+  if (!window.jspdf || !window.jspdf.jsPDF) return alert("PDF library not loaded");
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF("p", "mm", "a4");
+
+  doc.setFontSize(16);
+  doc.text("SIS — Discovery Results", 14, 15);
+
+  doc.setFontSize(10);
+  doc.text(`Generated: ${ts.toLocaleString()}`, 14, 22);
+  doc.text(`Marketplace: ${payload.marketplace}`, 14, 27);
+  doc.text(`Category: ${payload.category}`, 14, 32);
+  doc.text(`Count: ${payload.count}`, 14, 37);
+
+  if (typeof doc.autoTable !== "function") return alert("autoTable not loaded");
+
+  doc.autoTable({
+    startY: 45,
+    head: [["Product", "Category", "Price", "Signal", "Note"]],
+    body: data.candidates.map((c) => [c.product, c.category, c.priceRange, c.signal, c.note]),
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [30, 58, 138] },
+    columnStyles: {
+      0: { cellWidth: 45 },
+      1: { cellWidth: 35 },
+      2: { cellWidth: 22 },
+      3: { cellWidth: 18 },
+      4: { cellWidth: 70 },
+    },
+  });
+
+  doc.save(`SIS_Discovery_${Date.now()}.pdf`);
 });
 
 // ---------- decision ----------
@@ -155,35 +136,29 @@ $("decision-generate")?.addEventListener("click", async () => {
     const data = await api.decision(payload);
     lastDecision = { payload, data, ts: new Date() };
 
+    const lang = payload.language;
+
     const out = [];
-    out.push(`VERDICT: ${data.verdict}`);
-    out.push(`SUMMARY: ${data.summary}`);
+    out.push(`${t(lang, "VERDICT", "VEREDICTO")}: ${data.verdict}`);
+    out.push(`${t(lang, "SUMMARY", "RESUMEN")}: ${data.summary}`);
     out.push("");
 
     if (data.extracted_signals) {
-      out.push("EXTRACTED:");
-      Object.entries(data.extracted_signals).forEach(([k, v]) =>
-        out.push(`- ${k}: ${v ?? ""}`)
-      );
+      out.push(t(lang, "EXTRACTED SIGNALS:", "SEÑALES EXTRAÍDAS:"));
+      Object.entries(data.extracted_signals).forEach(([k, v]) => out.push(`- ${k}: ${v ?? ""}`));
       out.push("");
     }
 
-    out.push("DISCARD RULES:");
+    out.push(t(lang, "DISCARD RULES:", "REGLAS DE DESCARTE:"));
     (data.discard_rules_results || []).forEach((r) => {
-      out.push(
-        `- ${r.rule}: ${r.passed ? "PASSED" : "FAILED"}${
-          r.reason ? ` | ${r.reason}` : ""
-        }`
-      );
+      out.push(`- ${r.rule}: ${r.passed ? "PASSED" : "FAILED"}${r.reason ? ` | ${r.reason}` : ""}`);
     });
 
     out.push("");
 
     if (data.star_score?.components) {
-      out.push(`STAR SCORE: ${data.star_score.totalScore}/100`);
-      data.star_score.components.forEach((c) =>
-        out.push(`- ${c.name}: ${c.score} (${c.weight}%)`)
-      );
+      out.push(`${t(lang, "STAR SCORE", "PUNTUACIÓN")}: ${data.star_score.totalScore}/100`);
+      data.star_score.components.forEach((c) => out.push(`- ${c.name}: ${c.score} (${c.weight}%)`));
     }
 
     $("decision-text").textContent = out.join("\n");
@@ -193,117 +168,133 @@ $("decision-generate")?.addEventListener("click", async () => {
   }
 });
 
-// ✅ Decision PDF (fix: no “Field/Value” vertical letters)
+// ✅ Professional Decision PDF (no JSON, pro structure)
 $("download-decision-pdf")?.addEventListener("click", () => {
   try {
     if (!lastDecision?.data) return alert("No decision data");
 
     const { payload, data, ts } = lastDecision;
+    const lang = payload.language;
     const sig = data.extracted_signals || {};
 
     if (!window.jspdf || !window.jspdf.jsPDF) return alert("PDF library not loaded");
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF("p", "mm", "a4");
 
+    if (typeof doc.autoTable !== "function") return alert("autoTable not loaded");
+
+    // Header
     doc.setFontSize(16);
-    doc.text("SIS — Decision Report", 14, 15);
+    doc.text(t(lang, "Decision Engine Analysis Report", "Reporte de Análisis del Motor de Decisión"), 14, 15);
 
     doc.setFontSize(10);
-    doc.text(`Generated: ${ts.toLocaleString()}`, 14, 22);
-    doc.text(`Marketplace: ${payload.marketplace}`, 14, 27);
-    doc.text(`Phase: ${payload.product_phase}`, 14, 32);
-    doc.text(`Strategy: ${payload.entry_strategy}`, 14, 37);
+    doc.text(`${t(lang, "Date", "Fecha")}: ${ts.toLocaleString()}`, 14, 22);
+    doc.text(`${t(lang, "Marketplace", "Marketplace")}: ${payload.marketplace}`, 14, 27);
+    doc.text(`${t(lang, "Profile", "Perfil")}: ${payload.capital_profile} / ${payload.product_phase} / ${payload.entry_strategy}`, 14, 32);
 
-    doc.setFontSize(12);
-    doc.text(`VERDICT: ${data.verdict}`, 14, 45);
+    // Verdict big badge
+    const verdict = data.verdict || "DISCARDED";
+    doc.setFontSize(14);
+    doc.text(t(lang, "FINAL VERDICT:", "VEREDICTO FINAL:"), 14, 42);
 
-    doc.setFontSize(10);
-    const summaryLines = doc.splitTextToSize(`SUMMARY: ${data.summary}`, 180);
-    doc.text(summaryLines, 14, 52);
+    doc.setFontSize(20);
+    doc.text(verdict, 14, 52);
 
-    let y = 52 + summaryLines.length * 5 + 8;
-
-    // Key data as text blocks (no table)
+    // Summary
     doc.setFontSize(11);
-    doc.text("Key Data", 14, y);
-    y += 6;
+    doc.text(t(lang, "Executive Summary", "Resumen Ejecutivo"), 14, 62);
+    doc.setFontSize(10);
+    const summaryLines = doc.splitTextToSize(`${data.summary || ""}`, 180);
+    doc.text(summaryLines, 14, 68);
 
-    doc.setFontSize(9);
-    const kv = [
-      ["URL", payload.url],
-      ["Title", sig.title || ""],
-      ["Brand", sig.brandName || ""],
-      ["Category", sig.category || ""],
-      ["Price", sig.price ?? ""],
-      ["Rating", sig.rating ?? ""],
-      ["Reviews", sig.reviewCount ?? ""],
-      ["BSR", sig.bsr ?? ""],
-      ["Competitors", sig.competitorCount ?? ""],
-      ["WeightKg", sig.weightKg ?? ""],
+    let y = 68 + summaryLines.length * 5 + 4;
+
+    // Product Info table (2 columns) — SAFE
+    const productRows = [
+      [t(lang, "URL", "URL"), safeStr(payload.url)],
+      [t(lang, "Title", "Título"), safeStr(sig.title)],
+      [t(lang, "Brand", "Marca"), safeStr(sig.brandName)],
+      [t(lang, "Category", "Categoría"), safeStr(sig.category)],
+      [t(lang, "Price", "Precio"), safeStr(sig.price)],
+      [t(lang, "Rating", "Rating"), safeStr(sig.rating)],
+      [t(lang, "Reviews", "Reseñas"), safeStr(sig.reviewCount)],
+      [t(lang, "BSR", "BSR"), safeStr(sig.bsr)],
+      [t(lang, "Competitors (offers)", "Competidores (ofertas)"), safeStr(sig.competitorCount)],
+      [t(lang, "Weight (kg)", "Peso (kg)"), safeStr(sig.weightKg)],
     ];
 
-    for (const [k, v] of kv) {
-      if (y > 270) {
-        doc.addPage();
-        y = 20;
-      }
-      doc.setFont(undefined, "bold");
-      doc.text(`${k}:`, 14, y);
-      doc.setFont(undefined, "normal");
-      const lines = doc.splitTextToSize(String(v ?? ""), 150);
-      doc.text(lines, 45, y);
-      y += Math.max(5, lines.length * 4);
-    }
+    doc.autoTable({
+      startY: y,
+      head: [[t(lang, "Product Info", "Información del Producto"), ""]],
+      body: productRows,
+      styles: { fontSize: 9, cellPadding: 2, overflow: "linebreak" },
+      headStyles: { fillColor: [30, 58, 138] },
+      columnStyles: {
+        0: { cellWidth: 55 },
+        1: { cellWidth: 125 },
+      },
+    });
 
-    // DR table
-    if (typeof doc.autoTable === "function") {
-      const drRows = (data.discard_rules_results || []).map((r) => [
+    y = doc.lastAutoTable.finalY + 8;
+
+    // Discard Rules table
+    const dr = data.discard_rules_results || [];
+    doc.autoTable({
+      startY: y,
+      head: [[t(lang, "Discard Rules", "Reglas de Descarte"), t(lang, "Result", "Resultado"), t(lang, "Reason", "Motivo")]],
+      body: dr.map(r => [
         r.rule,
-        r.passed ? "PASSED" : "FAILED",
-        r.reason || "",
-      ]);
+        r.passed ? t(lang, "PASS", "APROBADA") : t(lang, "FAIL", "FALLIDA"),
+        r.reason || ""
+      ]),
+      styles: { fontSize: 9, overflow: "linebreak" },
+      headStyles: { fillColor: [30, 58, 138] },
+      columnStyles: {
+        0: { cellWidth: 70 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 98 },
+      },
+    });
 
+    y = doc.lastAutoTable.finalY + 8;
+
+    // Star Score table
+    if (data.star_score?.components) {
+      const comps = data.star_score.components || [];
       doc.autoTable({
-        startY: y + 6,
-        head: [["Rule", "Result", "Reason"]],
-        body: drRows,
-        styles: { fontSize: 9 },
+        startY: y,
+        head: [[t(lang, "Star Score", "Puntuación"), t(lang, "Score", "Score"), t(lang, "Weight", "Peso"), t(lang, "Explanation", "Explicación")]],
+        body: comps.map(c => [c.name, String(c.score), `${c.weight}%`, c.explanation || ""]),
+        styles: { fontSize: 9, overflow: "linebreak" },
         headStyles: { fillColor: [30, 58, 138] },
         columnStyles: {
-          0: { cellWidth: 70 },
-          1: { cellWidth: 25 },
-          2: { cellWidth: 95 },
+          0: { cellWidth: 35 },
+          1: { cellWidth: 18 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 117 },
         },
       });
-
-      // Star score table
-      if (data.star_score?.components) {
-        const comps = data.star_score.components.map((c) => [
-          c.name,
-          String(c.score),
-          `${c.weight}%`,
-          c.explanation || "",
-        ]);
-
-        doc.autoTable({
-          startY: doc.lastAutoTable.finalY + 8,
-          head: [["Component", "Score", "Weight", "Explanation"]],
-          body: comps,
-          styles: { fontSize: 9 },
-          headStyles: { fillColor: [30, 58, 138] },
-          columnStyles: {
-            0: { cellWidth: 35 },
-            1: { cellWidth: 18 },
-            2: { cellWidth: 20 },
-            3: { cellWidth: 117 },
-          },
-        });
-      }
+      y = doc.lastAutoTable.finalY + 8;
     }
+
+    // Strategic Recommendation (simple + safe)
+    const rec =
+      verdict === "APPROVED"
+        ? t(lang, "Proceed. Validate differentiation and PPC plan before scaling.", "Proceder. Validar diferenciación y plan de PPC antes de escalar.")
+        : verdict === "BORDERLINE"
+          ? t(lang, "Validate demand and competition signals. If confirmed, iterate with differentiation.", "Validar demanda y competencia. Si se confirma, iterar con diferenciación.")
+          : t(lang, "Avoid for this profile. Risk is too high or critical rule failed.", "Evitar para este perfil. Riesgo alto o falló una regla crítica.");
+
+    doc.setFontSize(11);
+    doc.text(t(lang, "Strategic Recommendation", "Recomendación Estratégica"), 14, y);
+    doc.setFontSize(10);
+    const recLines = doc.splitTextToSize(rec, 180);
+    doc.text(recLines, 14, y + 6);
 
     const asin = data?.request_info?.asin || "";
     const fname = asin ? `SIS_Decision_${asin}.pdf` : `SIS_Decision_${Date.now()}.pdf`;
     doc.save(fname);
+
   } catch (e) {
     alert(`PDF export failed: ${e.message}`);
   }
@@ -311,17 +302,12 @@ $("download-decision-pdf")?.addEventListener("click", () => {
 
 // ---------- run log ----------
 function getLog() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.RUN_LOG) || "[]");
-  } catch {
-    return [];
-  }
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.RUN_LOG) || "[]"); }
+  catch { return []; }
 }
-
 function setLog(entries) {
   localStorage.setItem(STORAGE_KEYS.RUN_LOG, JSON.stringify(entries));
 }
-
 function renderLog() {
   const container = $("log-container");
   const empty = $("empty-log");
